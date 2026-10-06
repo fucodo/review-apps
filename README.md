@@ -97,6 +97,12 @@ The dashboard provides the same data in machine-readable form at `/api/environme
 
 **Logo:** `DASHBOARD_LOGO` in `.env` shows a logo in the dashboard header, `DASHBOARD_LOGO_LINK` makes it a link. The logo can be an http(s) URL, a data URI (quote it, because `install.sh` sources `.env` and the `;` would break the line) or plain base64 image data (paste the output of `base64 -w0 logo.png`; the image type is detected automatically). Run `./install.sh` afterwards to apply it.
 
+The logo is also used as favicon (`/icon`, `/favicon.ico`) and app icon (web manifest, `apple-touch-icon`):
+
+- Inline logos (data URI or base64) are served by the dashboard. SVGs are centered on the smallest enclosing square, so wide or tall logos are neither stretched nor cropped.
+- URL logos are referenced directly (`/icon` redirects to them) and used as they are.
+- iOS does not support SVG touch icons; for a home screen icon on iPhone/iPad use a square PNG (ideally 180×180).
+
 ## Protected branch deployments
 
 Protected branches (e.g. `main`, `develop`, `staging`) can be deployed permanently with the same stack file. The deploy job differs from the MR job only in its rule and a few variables:
