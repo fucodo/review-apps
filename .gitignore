@@ -1,2 +1,5 @@
-dashboard/vendor
-/.idea
+.idea
+.env
+acme/
+auth/users.htpasswd
+dynamic/review-auth.yml
