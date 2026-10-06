@@ -84,6 +84,9 @@ services:
       OAUTH2_PROXY_DISPLAY_HTPASSWD_FORM: "false"
     volumes:
       - ./auth:/etc/oauth2-proxy/auth:ro
+      # Use the host's name resolution overrides, e.g. GitLab on an internal IP (split DNS).
+      # Docker service names are still resolved by Docker's DNS.
+      - /etc/hosts:/etc/hosts:ro
     networks: [traefik]
     labels:
       traefik.enable: "true"

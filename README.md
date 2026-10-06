@@ -14,7 +14,7 @@ The stacks themselves belong in the respective application repository (see `exam
 - Linux host with Docker Engine and the Compose plugin (`docker compose version`)
 - Ports **80** and **443** reachable from the internet (for the TLS challenge)
 - DNS: `*.<BASE_DOMAIN>` (wildcard A record) points to the host
-- The host can reach the GitLab container registry (add an internal `/etc/hosts` entry if necessary)
+- The host can reach GitLab and its container registry (add internal `/etc/hosts` entries if necessary, e.g. `10.10.10.18 gitlab.example.org`). oauth2-proxy mounts the host's `/etc/hosts`, so these entries apply to the GitLab login as well.
 
 ## Installation
 
