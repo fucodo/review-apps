@@ -4,9 +4,11 @@
     "minimum-stability": "stable",
     "prefer-stable": true,
     "require": {
-        "php": ">=8.4",
         "ext-ctype": "*",
+        "ext-dom": "*",
+        "ext-fileinfo": "*",
         "ext-iconv": "*",
+        "php": ">=8.4",
         "symfony/cache": "8.1.*",
         "symfony/console": "8.1.*",
         "symfony/dotenv": "8.1.*",

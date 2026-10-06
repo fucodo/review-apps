@@ -4,6 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Review-Umgebungen</title>
+<meta name="application-name" content="Review-Umgebungen">
+<meta name="apple-mobile-web-app-title" content="Reviews">
+<link rel="manifest" href="{{ path('manifest') }}">
+{% if logo.src %}
+  {# Inline logos are served by the dashboard (SVGs squared), URLs are used as is #}
+  {% set icon = logo.inline ? path('icon', {v: logo.version}) : logo.src %}
+  <link rel="icon" href="{{ icon }}"{% if logo.type %} type="{{ logo.type }}"{% endif %}>
+  {# iOS ignores SVG touch icons #}
+  {% if logo.type != 'image/svg+xml' %}<link rel="apple-touch-icon" href="{{ icon }}">{% endif %}
+{% endif %}
 <style>
   :root { --bg:#f7f7f8; --fg:#1d1d1f; --muted:#6b6b70; --card:#fff; --line:#e3e3e6; --ok:#1f8a4c; --bad:#c23b3b; --link:#2456c7; --chip:#eef0f4; }
   @media (prefers-color-scheme: dark) {
