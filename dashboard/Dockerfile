@@ -11,6 +11,7 @@ RUN docker-php-ext-enable opcache \
 ENV APP_ENV=prod APP_DEBUG=0
 WORKDIR /srv
 COPY --from=vendor --chown=www-data:www-data /app /srv
+RUN install -d -o www-data -g www-data /srv/var
 USER www-data
 RUN php bin/console cache:warmup
 EXPOSE 8080
