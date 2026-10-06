@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Review-Umgebungen</title>
+<style>
+  :root { --bg:#f7f7f8; --fg:#1d1d1f; --muted:#6b6b70; --card:#fff; --line:#e3e3e6; --ok:#1f8a4c; --bad:#c23b3b; --link:#2456c7; --chip:#eef0f4; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#151517; --fg:#ececee; --muted:#9a9aa0; --card:#1f1f22; --line:#2e2e33; --ok:#4cc27e; --bad:#ef6b6b; --link:#7ea2ff; --chip:#2a2a2f; }
+  }
+  body { margin:0; font:15px/1.45 system-ui, sans-serif; background:var(--bg); color:var(--fg); }
+  main { max-width:1200px; margin:0 auto; padding:24px 16px; }
+  h1 { font-size:1.4rem; margin:0 0 4px; }
+</style>
+<script type="module" src="/review-environments.js"></script>
+</head>
+<body>
+<main>
+  <h1>Review-Umgebungen</h1>
+  <review-environments src="{{ path('api_environments') }}" refresh="30"></review-environments>
+</main>
+</body>
+</html>

@@ -1,0 +1,7 @@
+# Generated from templates/review-auth.none.yml by install.sh – do not edit.
+http:
+  middlewares:
+    review-auth:
+      headers:
+        customResponseHeaders:
+          X-Robots-Tag: "noindex, nofollow"

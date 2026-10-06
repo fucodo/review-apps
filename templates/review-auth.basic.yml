@@ -1,0 +1,17 @@
+# Generated from templates/review-auth.basic.yml by install.sh – do not edit.
+http:
+  middlewares:
+    review-noindex:
+      headers:
+        customResponseHeaders:
+          X-Robots-Tag: "noindex, nofollow"
+    review-basic:
+      basicAuth:
+        realm: "Review"
+        usersFile: /etc/traefik/auth/users.htpasswd
+        removeHeader: true
+    review-auth:
+      chain:
+        middlewares:
+          - review-noindex
+          - review-basic

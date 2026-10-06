@@ -1,0 +1,21 @@
+# see https://symfony.com/doc/current/reference/configuration/framework.html
+framework:
+    secret: '%env(APP_SECRET)%'
+
+    # Stateless dashboard, authentication happens in Traefik (review-auth@file)
+    session: false
+
+    http_client:
+        scoped_clients:
+            # Read-only Docker API via docker-socket-proxy (CONTAINERS=1)
+            docker.client:
+                base_uri: '%env(DOCKER_API)%'
+                timeout: 2
+                max_duration: 5
+                retry_failed:
+                    max_retries: 2
+                    delay: 200
+
+when@test:
+    framework:
+        test: true

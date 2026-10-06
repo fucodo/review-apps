@@ -1,0 +1,6 @@
+framework:
+    cache:
+        pools:
+            # Short-lived cache for Docker API results, see ReviewEnvironmentProvider
+            review.cache:
+                adapter: cache.adapter.filesystem

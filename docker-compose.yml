@@ -1,0 +1,89 @@
+name: review-infra
+
+services:
+  traefik:
+    image: traefik:${TRAEFIK_VERSION:-v3}
+    restart: unless-stopped
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=traefik
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --providers.file.watch=true
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.websecure.http.tls.certresolver=le
+      - --certificatesresolvers.le.acme.email=${ACME_EMAIL}
+      - --certificatesresolvers.le.acme.storage=/acme/acme.json
+      - --certificatesresolvers.le.acme.tlschallenge=true
+      - --certificatesresolvers.le.acme.caserver=${ACME_CA_SERVER}
+      - --log.level=${TRAEFIK_LOG_LEVEL:-INFO}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./acme:/acme
+      - ./dynamic:/etc/traefik/dynamic:ro
+      - ./auth:/etc/traefik/auth:ro
+    networks: [traefik]
+
+  # Read-only Docker API for the dashboard (container listing only)
+  socket-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [dashboard]
+
+  dashboard:
+    build: ./dashboard
+    restart: unless-stopped
+    environment:
+      DOCKER_API: http://socket-proxy:2375
+    depends_on: [socket-proxy]
+    networks: [traefik, dashboard]
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.review-dashboard.rule: Host(`${DASHBOARD_HOST}`)
+      traefik.http.routers.review-dashboard.entrypoints: websecure
+      traefik.http.routers.review-dashboard.middlewares: review-auth@file
+      traefik.http.services.review-dashboard.loadbalancer.server.port: "8080"
+
+  oauth2-proxy:
+    profiles: [oidc]
+    image: quay.io/oauth2-proxy/oauth2-proxy:${OAUTH2_PROXY_VERSION:-latest}
+    restart: unless-stopped
+    environment:
+      OAUTH2_PROXY_PROVIDER: gitlab
+      OAUTH2_PROXY_OIDC_ISSUER_URL: ${GITLAB_URL}
+      OAUTH2_PROXY_CLIENT_ID: ${GITLAB_CLIENT_ID}
+      OAUTH2_PROXY_CLIENT_SECRET: ${GITLAB_CLIENT_SECRET}
+      OAUTH2_PROXY_COOKIE_SECRET: ${OAUTH2_COOKIE_SECRET}
+      OAUTH2_PROXY_GITLAB_GROUPS: ${GITLAB_GROUPS}
+      OAUTH2_PROXY_EMAIL_DOMAINS: "*"
+      OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180
+      OAUTH2_PROXY_UPSTREAMS: static://202
+      OAUTH2_PROXY_REVERSE_PROXY: "true"
+      OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "true"
+      OAUTH2_PROXY_REDIRECT_URL: https://${AUTH_HOST}/oauth2/callback
+      OAUTH2_PROXY_COOKIE_DOMAINS: .${BASE_DOMAIN}
+      OAUTH2_PROXY_WHITELIST_DOMAINS: .${BASE_DOMAIN}
+      OAUTH2_PROXY_COOKIE_SECURE: "true"
+      OAUTH2_PROXY_SET_XAUTHREQUEST: "true"
+    networks: [traefik]
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.review-auth-host.rule: Host(`${AUTH_HOST}`)
+      traefik.http.routers.review-auth-host.entrypoints: websecure
+      traefik.http.services.review-auth-host.loadbalancer.server.port: "4180"
+
+networks:
+  traefik:
+    name: traefik
+  dashboard:
+    internal: true

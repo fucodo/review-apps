@@ -1,0 +1,19 @@
+# Generated from templates/review-auth.oidc.yml by install.sh – do not edit.
+http:
+  middlewares:
+    review-noindex:
+      headers:
+        customResponseHeaders:
+          X-Robots-Tag: "noindex, nofollow"
+    review-oidc:
+      forwardAuth:
+        address: http://oauth2-proxy:4180/
+        trustForwardHeader: true
+        authResponseHeaders:
+          - X-Auth-Request-User
+          - X-Auth-Request-Email
+    review-auth:
+      chain:
+        middlewares:
+          - review-noindex
+          - review-oidc
