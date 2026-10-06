@@ -45,6 +45,8 @@ services:
     restart: unless-stopped
     environment:
       DOCKER_API: http://socket-proxy:2375
+      DASHBOARD_LOGO: ${DASHBOARD_LOGO:-}
+      DASHBOARD_LOGO_LINK: ${DASHBOARD_LOGO_LINK:-}
     depends_on: [socket-proxy]
     networks: [traefik, dashboard]
     labels:

@@ -11,14 +11,22 @@
   }
   body { margin:0; font:15px/1.45 system-ui, sans-serif; background:var(--bg); color:var(--fg); }
   main { max-width:1200px; margin:0 auto; padding:24px 16px; }
-  h1 { font-size:1.4rem; margin:0 0 4px; }
+  header { display:flex; align-items:center; gap:16px; margin:0 0 4px; }
+  header img { display:block; height:40px; width:auto; max-width:240px; object-fit:contain; }
+  h1 { font-size:1.4rem; margin:0; }
 </style>
 <script type="module" src="/review-environments.js"></script>
 </head>
 <body>
 <main>
   {% set project = app.request.query.get('project', '') %}
-  <h1>Review-Umgebungen{% if project %} · {{ project }}{% endif %}</h1>
+  <header>
+    {% if logo.src %}
+      {% set img %}<img src="{{ logo.src }}" alt="Logo">{% endset %}
+      {% if logo.link %}<a href="{{ logo.link }}">{{ img }}</a>{% else %}{{ img }}{% endif %}
+    {% endif %}
+    <h1>Review-Umgebungen{% if project %} · {{ project }}{% endif %}</h1>
+  </header>
   <review-environments src="{{ path('api_environments') }}" refresh="30" project="{{ project }}"></review-environments>
 </main>
 </body>

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Dashboard\Logo;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -12,7 +13,7 @@ use Symfony\Component\Routing\Attribute\Route;
 final class DashboardController extends AbstractController
 {
     #[Route('/', name: 'dashboard', methods: ['GET', 'HEAD'])]
-    public function index(Request $request): Response
+    public function index(Request $request, Logo $logo): Response
     {
         // Backwards compatibility for scripts using the old "?format=json" URL
         if ('json' === $request->query->get('format')) {
@@ -20,6 +21,6 @@ final class DashboardController extends AbstractController
         }
 
         // The page is only a shell, data is loaded by <review-environments> from the API
-        return $this->render('dashboard.html.twig');
+        return $this->render('dashboard.html.twig', ['logo' => $logo]);
     }
 }

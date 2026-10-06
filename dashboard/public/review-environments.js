@@ -10,22 +10,43 @@
 const STYLE = `
   :host { display:block; }
   p.meta { color:var(--muted); margin:0 0 20px; }
-  .wrap { overflow-x:auto; background:var(--card); border:1px solid var(--line); border-radius:10px; }
-  table { width:100%; border-collapse:collapse; }
-  th, td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--line); white-space:nowrap; vertical-align:top; }
-  td.title { white-space:normal; min-width:240px; }
-  tr:last-child td { border-bottom:0; }
-  th { font-size:.8rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
   a { color:var(--link); text-decoration:none; }
   code { font-size:.85em; }
-  .chips { display:flex; flex-wrap:wrap; gap:6px; white-space:normal; min-width:200px; }
+
+  /* Desktop: cards share one column grid (subgrid), so they line up like table rows */
+  .list { display:grid; grid-template-columns:[project] auto [mr] auto [main] minmax(240px, 1fr) [branch] auto [commit] auto [author] auto [deployed] auto; row-gap:8px; }
+  .list.single-project { grid-template-columns:[mr] auto [main] minmax(240px, 1fr) [branch] auto [commit] auto [author] auto [deployed] auto; }
+  .head, .card { grid-column:1 / -1; display:grid; grid-template-columns:subgrid; align-items:start; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; }
+  .cell { padding:10px 12px; white-space:nowrap; min-width:0; }
+  .head .cell { padding-block:0 2px; font-size:.8rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+  .card .cell:not(.main) { overflow:hidden; text-overflow:ellipsis; max-width:220px; }
+  .main { white-space:normal; }
+  .title { font-weight:500; overflow-wrap:anywhere; }
+  .label { display:none; }
+
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
   .chip { display:inline-flex; align-items:center; gap:6px; padding:2px 10px; border-radius:999px; background:var(--chip); font-size:.85rem; }
   .dot { width:8px; height:8px; border-radius:50%; background:var(--muted); flex:none; }
   .running .dot { background:var(--ok); }
   .exited .dot, .dead .dot, .restarting .dot { background:var(--bad); }
-  .empty, .error { padding:24px; color:var(--muted); }
+
+  .empty, .error { padding:24px; color:var(--muted); background:var(--card); border:1px solid var(--line); border-radius:10px; }
   .error { color:var(--bad); }
-  p.meta .error { padding:0; }
+  p.meta .error { padding:0; background:none; border:0; }
+
+  /* Mobile: stacked cards, title and service links first, details below with labels */
+  @media (max-width: 900px) {
+    .list, .list.single-project { display:flex; flex-direction:column; gap:10px; }
+    .head { display:none; }
+    .card { display:flex; flex-wrap:wrap; column-gap:16px; padding:10px 14px; min-width:0; }
+    .cell { padding:2px 0; }
+    .card .cell:not(.main) { max-width:100%; white-space:normal; overflow-wrap:anywhere; }
+    .detail.blank { display:none; }
+    .main { flex-basis:100%; padding:4px 0 8px; }
+    .detail { color:var(--muted); font-size:.9rem; }
+    .label { display:inline; margin-right:4px; }
+  }
 `;
 
 /** Builds an element; children may be nodes, strings or null. Text is never parsed as HTML. */
@@ -178,32 +199,37 @@ class ReviewEnvironments extends HTMLElement {
       body = this.#error ? h('div', { class: 'error' }, this.#error) : h('div', { class: 'empty' }, 'Keine Review-Umgebungen deployt.');
     } else {
       // The project column is redundant when filtered to a single project
-      const columns = ['Projekt', 'MR', 'Titel', 'Branch', 'Commit', 'Autor', 'Deployt', 'Dienste'].slice(this.project ? 1 : 0);
-      body = h('table', {},
-        h('thead', {}, h('tr', {}, ...columns.map((t) => h('th', {}, t)))),
-        h('tbody', {}, ...envs.map((env) => this.#row(env))),
+      const columns = ['Projekt', 'MR', 'Titel & Dienste', 'Branch', 'Commit', 'Autor', 'Deployt'].slice(this.project ? 1 : 0);
+      body = h('div', { class: this.project ? 'list single-project' : 'list', role: 'list' },
+        h('div', { class: 'head', 'aria-hidden': 'true' }, ...columns.map((t) => h('div', { class: 'cell' }, t))),
+        ...envs.map((env) => this.#card(env)),
       );
     }
 
-    content.replaceChildren(meta, h('div', { class: 'wrap' }, body));
+    content.replaceChildren(meta, body);
   }
 
-  #row({ project, mr, app, services }) {
+  #card({ project, mr, app, services }) {
     const a = app ?? {};
     const mrUrl = safeUrl(a.mr_url ?? '');
+    // Empty details keep their grid cell on desktop, but are hidden on mobile
+    const detail = (label, value, attrs = {}) =>
+      h('div', { class: value.textContent ?? value ? 'cell detail' : 'cell detail blank', ...attrs }, h('span', { class: 'label' }, `${label}:`), value);
 
-    return h('tr', {},
-      this.project ? null : h('td', {}, project || '–'),
-      h('td', {}, mrUrl ? h('a', { href: mrUrl }, `!${mr}`) : `!${mr}`),
-      h('td', { class: 'title' }, app ? a.title : h('i', {}, 'App-Container fehlt')),
-      h('td', {}, h('code', {}, a.branch ?? '')),
-      h('td', {}, h('code', {}, a.commit ?? '')),
-      h('td', {}, a.author ?? ''),
-      h('td', { title: a.deployed_at }, ago(a.deployed_at ?? '')),
-      h('td', {}, h('div', { class: 'chips' },
-        app ? this.#chip('App', a) : null,
-        ...services.map((s) => this.#chip(s.name, s)),
-      )),
+    return h('article', { class: 'card', role: 'listitem' },
+      this.project ? null : h('div', { class: 'cell', title: project }, project || '–'),
+      h('div', { class: 'cell' }, mrUrl ? h('a', { href: mrUrl }, `!${mr}`) : `!${mr}`),
+      h('div', { class: 'cell main' },
+        h('div', { class: 'title' }, app ? a.title : h('i', {}, 'App-Container fehlt')),
+        h('div', { class: 'chips' },
+          app ? this.#chip('App', a) : null,
+          ...services.map((s) => this.#chip(s.name, s)),
+        ),
+      ),
+      detail('Branch', h('code', {}, a.branch ?? ''), { title: a.branch }),
+      detail('Commit', h('code', {}, a.commit ?? '')),
+      detail('Autor', a.author ?? ''),
+      detail('Deployt', a.deployed_at ? ago(a.deployed_at) : '', { title: a.deployed_at }),
     );
   }
 

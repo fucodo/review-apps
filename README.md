@@ -91,6 +91,8 @@ Complete example: `examples/docker-compose.review.yml`.
 
 The dashboard provides the same data in machine-readable form at `/api/environments` (`?format=json` still works). Both the page and the API accept `?project=<CI_PROJECT_PATH>` to show a single project only. The page itself loads its data exclusively through this API and refreshes every 30 seconds.
 
+**Logo:** `DASHBOARD_LOGO` in `.env` shows a logo in the dashboard header, `DASHBOARD_LOGO_LINK` makes it a link. The logo can be an http(s) URL, a data URI (quote it, because `install.sh` sources `.env` and the `;` would break the line) or plain base64 image data (paste the output of `base64 -w0 logo.png`; the image type is detected automatically). Run `./install.sh` afterwards to apply it.
+
 ## Operations
 
 ```bash
