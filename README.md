@@ -1,4 +1,4 @@
-# review-infra
+# review-apps
 
 Shared infrastructure for per-merge-request review environments on a single Docker host:
 
