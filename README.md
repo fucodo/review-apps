@@ -1,13 +1,13 @@
 # review-apps
 
-Shared infrastructure for per-merge-request review environments on a single Docker host:
+Shared infrastructure for review environments on a single Docker host – one per merge request, plus long-lived deployments of protected branches (e.g. `main`, `develop`):
 
 - **Traefik v3** – routing via Docker labels, Let's Encrypt certificates via the TLS-ALPN challenge (no DNS API required)
 - **Access control** – `none`, `basic` (htpasswd) or `oidc` (GitLab login via oauth2-proxy), applied centrally as the `review-auth@file` middleware
-- **Dashboard** – lists all deployed MR environments, including sub-services (Mailpit, DB, …), based on their labels
+- **Dashboard** – lists all protected branch deployments and MR environments (in separate sections), including sub-services (Mailpit, DB, …), based on their labels
 - **Image cleanup** – nightly `docker image prune` for old MR images
 
-The MR stacks themselves belong in the respective application repository (see `examples/docker-compose.review.yml`) and are deployed by GitLab CI via `DOCKER_HOST=ssh://…`.
+The stacks themselves belong in the respective application repository (see `examples/docker-compose.review.yml`, the same file serves both deployment types) and are deployed by GitLab CI via `DOCKER_HOST=ssh://…`.
 
 ## Requirements
 
@@ -67,11 +67,11 @@ Creates the user `deploy` (member of the `docker` group) and generates a key tha
 |---|---|
 | `REVIEW_SSH_TARGET` | Variable |
 | `REVIEW_SSH_KNOWN_HOSTS` | Variable |
-| `REVIEW_SSH_KEY` | File, *Protected* off (MR branches are usually not protected) |
+| `REVIEW_SSH_KEY` | File, *Protected* off (MR branches are usually not protected; protected branch jobs can use it as well) |
 
 Running it again rotates the key.
 
-## Label convention for MR stacks
+## Label convention for review stacks
 
 Complete example: `examples/docker-compose.review.yml`.
 
@@ -81,22 +81,47 @@ Complete example: `examples/docker-compose.review.yml`.
 
 | Label | Where | Meaning |
 |---|---|---|
-| `review.project` | all containers of the stack | GitLab project path (`${CI_PROJECT_PATH}`); together with `review.mr` it groups the containers, since MR IIDs are only unique per project |
-| `review.mr` | all containers of the stack | MR IID (`${CI_MERGE_REQUEST_IID}`) |
+| `review.type` | all containers of the stack | `mr` (default) or `branch` (protected branch deployment) |
+| `review.project` | all containers of the stack | GitLab project path (`${CI_PROJECT_PATH}`); together with `review.mr` or `review.branch` it groups the containers, since MR IIDs and branch names are only unique per project |
+| `review.mr` | all containers of the stack (`mr`) | MR IID (`${CI_MERGE_REQUEST_IID}`) |
+| `review.branch` | all containers of the stack | Branch name (`${CI_COMMIT_REF_NAME}`); groups the containers of `branch` deployments, for `mr` only shown |
 | `review.role` | all | `app` (metadata) or `service` (sub-service) |
-| `review.title`, `review.branch`, `review.commit`, `review.author`, `review.url`, `review.mr_url`, `review.deployed_at` | `app` | Shown in the dashboard |
+| `review.title`, `review.commit`, `review.author`, `review.url`, `review.deployed_at` | `app` | Shown in the dashboard |
+| `review.mr_url` | `app` (`mr`) | Link of the MR number |
+| `review.branch_url`, optional | `app` | Link of the branch name |
 | `review.service.name` | `service` | Chip label |
 | `review.service.url` | `service`, optional | Turns the chip into a link |
 | `review.service.order` | `service`, optional | Sort order |
 
-The dashboard provides the same data in machine-readable form at `/api/environments` (`?format=json` still works). Both the page and the API accept `?project=<CI_PROJECT_PATH>` to show a single project only. The page itself loads its data exclusively through this API and refreshes every 30 seconds.
+The dashboard provides the same data in machine-readable form at `/api/environments` (`?format=json` still works): `branches` holds the protected branch deployments, `environments` the MR environments. Both the page and the API accept `?project=<CI_PROJECT_PATH>` to show a single project only. The page itself loads its data exclusively through this API and refreshes every 30 seconds.
 
 **Logo:** `DASHBOARD_LOGO` in `.env` shows a logo in the dashboard header, `DASHBOARD_LOGO_LINK` makes it a link. The logo can be an http(s) URL, a data URI (quote it, because `install.sh` sources `.env` and the `;` would break the line) or plain base64 image data (paste the output of `base64 -w0 logo.png`; the image type is detected automatically). Run `./install.sh` afterwards to apply it.
+
+## Protected branch deployments
+
+Protected branches (e.g. `main`, `develop`, `staging`) can be deployed permanently with the same stack file. The deploy job differs from the MR job only in its rule and a few variables:
+
+```yaml
+review:branch:
+  rules:
+    - if: $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"
+  variables:
+    REVIEW_TYPE: branch                                        # → label review.type=branch
+    STACK: review-$CI_PROJECT_PATH_SLUG-$CI_COMMIT_REF_SLUG
+    REVIEW_HOST: $CI_COMMIT_REF_SLUG-$CI_PROJECT_PATH_SLUG.tests.example.org
+  script:
+    - docker compose -p "$STACK" -f docker-compose.review.yml up -d   # same as the MR job
+  environment:
+    name: branch/$CI_COMMIT_REF_NAME
+    url: https://$REVIEW_HOST/
+```
+
+Every push to the branch redeploys the same stack, so the environment keeps its data. `STACK` and `REVIEW_HOST` must be unique across all projects on the host (a DNS label has at most 63 characters). Branch deployments are not removed automatically – stop them with `docker compose -p <stack> down` when the branch is no longer needed.
 
 ## Operations
 
 ```bash
-./install.sh status                  # infra containers + deployed MR environments
+./install.sh status                  # infra containers + deployed environments (MR and branch)
 docker compose logs -f traefik       # certificate/routing problems
 git pull && sudo ./install.sh        # update
 ```

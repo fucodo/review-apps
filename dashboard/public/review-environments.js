@@ -13,9 +13,12 @@ const STYLE = `
   a { color:var(--link); text-decoration:none; }
   code { font-size:.85em; }
 
-  /* Desktop: cards share one column grid (subgrid), so they line up like table rows */
-  .list { display:grid; grid-template-columns:[project] auto [mr] auto [main] minmax(240px, 1fr) [branch] auto [commit] auto [author] auto [deployed] auto; row-gap:8px; }
-  .list.single-project { grid-template-columns:[mr] auto [main] minmax(240px, 1fr) [branch] auto [commit] auto [author] auto [deployed] auto; }
+  section + section { margin-top:32px; }
+  h2 { font-size:1rem; margin:0 0 10px; }
+
+  /* Desktop: cards share one column grid (subgrid), so they line up like table rows.
+     The tracks are set per list in --columns, the title column takes the remaining space. */
+  .list { display:grid; grid-template-columns:var(--columns); row-gap:8px; }
   .head, .card { grid-column:1 / -1; display:grid; grid-template-columns:subgrid; align-items:start; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:10px; }
   .cell { padding:10px 12px; white-space:nowrap; min-width:0; }
@@ -37,7 +40,7 @@ const STYLE = `
 
   /* Mobile: stacked cards, title and service links first, details below with labels */
   @media (max-width: 900px) {
-    .list, .list.single-project { display:flex; flex-direction:column; gap:10px; }
+    .list { display:flex; flex-direction:column; gap:10px; }
     .head { display:none; }
     .card { display:flex; flex-wrap:wrap; column-gap:16px; padding:10px 14px; min-width:0; }
     .cell { padding:2px 0; }
@@ -181,6 +184,7 @@ class ReviewEnvironments extends HTMLElement {
 
   #render() {
     const content = this.shadowRoot.querySelector('[part=content]');
+    const branches = this.#data?.branches ?? [];
     const envs = this.#data?.environments ?? [];
 
     if (!this.#data && !this.#error) {
@@ -189,36 +193,65 @@ class ReviewEnvironments extends HTMLElement {
     }
 
     const meta = h('p', { class: 'meta' },
-      `${envs.length} Umgebung(en) · Stand ${time(this.#data?.fetched_at)} · `,
+      branches.length ? `${branches.length} Branch-Deployment(s) · ` : '',
+      `${envs.length} MR-Umgebung(en) · Stand ${time(this.#data?.fetched_at)} · `,
       h('a', { href: this.url }, 'JSON'),
     );
-    if (this.#error && envs.length) meta.append(' · ', h('span', { class: 'error' }, this.#error));
+    if (this.#error && (branches.length || envs.length)) meta.append(' · ', h('span', { class: 'error' }, this.#error));
 
-    let body;
+    let mrBody;
     if (!envs.length) {
-      body = this.#error ? h('div', { class: 'error' }, this.#error) : h('div', { class: 'empty' }, 'Keine Review-Umgebungen deployt.');
+      mrBody = this.#error && !branches.length
+        ? h('div', { class: 'error' }, this.#error)
+        : h('div', { class: 'empty' }, branches.length ? 'Keine MR-Umgebungen deployt.' : 'Keine Review-Umgebungen deployt.');
     } else {
-      // The project column is redundant when filtered to a single project
-      const columns = ['Projekt', 'MR', 'Titel & Dienste', 'Branch', 'Commit', 'Autor', 'Deployt'].slice(this.project ? 1 : 0);
-      body = h('div', { class: this.project ? 'list single-project' : 'list', role: 'list' },
-        h('div', { class: 'head', 'aria-hidden': 'true' }, ...columns.map((t) => h('div', { class: 'cell' }, t))),
-        ...envs.map((env) => this.#card(env)),
-      );
+      mrBody = this.#list(envs, 'MR', (env) => {
+        const mrUrl = safeUrl(env.app?.mr_url);
+        return mrUrl ? h('a', { href: mrUrl }, `!${env.mr}`) : `!${env.mr}`;
+      }, true);
     }
 
-    content.replaceChildren(meta, body);
+    content.replaceChildren(
+      meta,
+      // Branch deployments are long-lived, so they come first, but only if there are any
+      branches.length
+        ? h('section', {}, h('h2', {}, 'Protected Branches'), this.#list(branches, 'Branch', (env) => this.#branch(env.branch, env.app?.branch_url), false))
+        : '',
+      h('section', {}, branches.length ? h('h2', {}, 'Merge Requests') : '', mrBody),
+    );
   }
 
-  #card({ project, mr, app, services }) {
+  /**
+   * Renders a list of cards. The first column identifies the environment (MR or branch),
+   * withBranch adds a separate branch column (MRs only, for branches it is the identifier).
+   */
+  #list(items, idLabel, id, withBranch) {
+    // The project column is redundant when filtered to a single project
+    const columns = [
+      this.project ? null : ['Projekt', 'auto'],
+      [idLabel, 'auto'],
+      ['Titel & Dienste', 'minmax(240px, 1fr)'],
+      withBranch ? ['Branch', 'auto'] : null,
+      ['Commit', 'auto'],
+      ['Autor', 'auto'],
+      ['Deployt', 'auto'],
+    ].filter(Boolean);
+
+    return h('div', { class: 'list', role: 'list', style: `--columns:${columns.map(([, track]) => track).join(' ')}` },
+      h('div', { class: 'head', 'aria-hidden': 'true' }, ...columns.map(([label]) => h('div', { class: 'cell' }, label))),
+      ...items.map((env) => this.#card(env, id(env), withBranch)),
+    );
+  }
+
+  #card({ project, app, services }, id, withBranch) {
     const a = app ?? {};
-    const mrUrl = safeUrl(a.mr_url ?? '');
     // Empty details keep their grid cell on desktop, but are hidden on mobile
     const detail = (label, value, attrs = {}) =>
       h('div', { class: value.textContent ?? value ? 'cell detail' : 'cell detail blank', ...attrs }, h('span', { class: 'label' }, `${label}:`), value);
 
     return h('article', { class: 'card', role: 'listitem' },
       this.project ? null : h('div', { class: 'cell', title: project }, project || '–'),
-      h('div', { class: 'cell' }, mrUrl ? h('a', { href: mrUrl }, `!${mr}`) : `!${mr}`),
+      h('div', { class: 'cell' }, id),
       h('div', { class: 'cell main' },
         h('div', { class: 'title' }, app ? a.title : h('i', {}, 'App-Container fehlt')),
         h('div', { class: 'chips' },
@@ -226,11 +259,17 @@ class ReviewEnvironments extends HTMLElement {
           ...services.map((s) => this.#chip(s.name, s)),
         ),
       ),
-      detail('Branch', h('code', {}, a.branch ?? ''), { title: a.branch }),
+      withBranch ? detail('Branch', this.#branch(a.branch ?? '', a.branch_url), { title: a.branch }) : null,
       detail('Commit', h('code', {}, a.commit ?? '')),
       detail('Autor', a.author ?? ''),
       detail('Deployt', a.deployed_at ? ago(a.deployed_at) : '', { title: a.deployed_at }),
     );
+  }
+
+  #branch(name, url) {
+    const href = safeUrl(url);
+    const code = h('code', { title: name }, name);
+    return href ? h('a', { href }, code) : code;
   }
 
   #chip(label, { url, state, status }) {

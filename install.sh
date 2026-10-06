@@ -5,7 +5,7 @@
 #   ./install.sh add-user NAME   add/update a basic-auth user (password prompt)
 #   ./install.sh remove-user NAME
 #   ./install.sh users           list basic-auth users
-#   ./install.sh status          show infra containers and deployed MR environments
+#   ./install.sh status          show infra containers and deployed MR / branch environments
 set -euo pipefail
 
 cd "$(dirname "$(readlink -f "$0")")"
@@ -172,9 +172,9 @@ cmd_status() {
   info "Infrastructure"
   compose ps
   echo
-  info "Deployed MR environments"
-  docker ps -a --filter label=review.mr --filter label=review.title \
-    --format 'table {{.Label "review.project"}}\t{{.Label "review.mr"}}\t{{.Label "review.branch"}}\t{{.Status}}\t{{.Label "review.url"}}'
+  info "Deployed environments (app containers)"
+  docker ps -a --filter label=review.title \
+    --format 'table {{.Label "review.type"}}\t{{.Label "review.project"}}\t{{.Label "review.mr"}}\t{{.Label "review.branch"}}\t{{.Status}}\t{{.Label "review.url"}}'
 }
 
 case "${1:-install}" in

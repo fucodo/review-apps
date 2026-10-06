@@ -24,10 +24,12 @@ final class ApiController
         // Optional filter on the GitLab project path, e.g. ?project=group/app
         $project = $request->query->getString('project');
         if ('' !== $project) {
-            $data['environments'] = array_values(array_filter(
-                $data['environments'],
-                static fn (array $env): bool => $env['project'] === $project,
-            ));
+            foreach (['branches', 'environments'] as $list) {
+                $data[$list] = array_values(array_filter(
+                    $data[$list],
+                    static fn (array $env): bool => $env['project'] === $project,
+                ));
+            }
         }
 
         $response = new JsonResponse($data);
