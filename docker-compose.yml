@@ -77,6 +77,13 @@ services:
       OAUTH2_PROXY_WHITELIST_DOMAINS: .${BASE_DOMAIN}
       OAUTH2_PROXY_COOKIE_SECURE: "true"
       OAUTH2_PROXY_SET_XAUTHREQUEST: "true"
+      # Basic auth for automation (users from ./install.sh add-user), set by install.sh only if
+      # the users file has entries. Basic users get the GitLab groups, otherwise they'd be rejected.
+      OAUTH2_PROXY_HTPASSWD_FILE: ${OAUTH2_HTPASSWD_FILE:-}
+      OAUTH2_PROXY_HTPASSWD_USER_GROUPS: ${GITLAB_GROUPS}
+      OAUTH2_PROXY_DISPLAY_HTPASSWD_FORM: "false"
+    volumes:
+      - ./auth:/etc/oauth2-proxy/auth:ro
     networks: [traefik]
     labels:
       traefik.enable: "true"

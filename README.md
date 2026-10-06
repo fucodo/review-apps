@@ -3,7 +3,7 @@
 Shared infrastructure for review environments on a single Docker host – one per merge request, plus long-lived deployments of protected branches (e.g. `main`, `develop`):
 
 - **Traefik v3** – routing via Docker labels, Let's Encrypt certificates via the TLS-ALPN challenge (no DNS API required)
-- **Access control** – `none`, `basic` (htpasswd) or `oidc` (GitLab login via oauth2-proxy), applied centrally as the `review-auth@file` middleware
+- **Access control** – `none`, `basic` (htpasswd) or `oidc` (GitLab login via oauth2-proxy, optionally plus basic auth for automated tests), applied centrally as the `review-auth@file` middleware
 - **Dashboard** – lists all protected branch deployments and MR environments (in separate sections), including sub-services (Mailpit, DB, …), based on their labels
 - **Image cleanup** – nightly `docker image prune` for old MR images
 
@@ -54,6 +54,25 @@ Changes take effect immediately, without a restart.
 3. `sudo ./install.sh` – the cookie secret is generated automatically.
 
 A single login is valid for all MR environments and the dashboard (cookie on `.<BASE_DOMAIN>`). Only members of the groups listed in `GITLAB_GROUPS` get access.
+
+#### Basic auth for automated tests
+
+Humans log in with GitLab, while automated tests (Playwright, Cypress, curl, …) can't click through an OAuth login. For them, add basic-auth users – in `oidc` mode they are accepted **in addition** to the GitLab login:
+
+```bash
+sudo ./install.sh add-user e2e        # prompts for the password, restarts oauth2-proxy
+```
+
+```bash
+curl -u e2e:<password> https://mr-42.tests.example.org/
+# Playwright: use({ httpCredentials: { username: 'e2e', password: process.env.REVIEW_PASSWORD } })
+```
+
+- Browsers without credentials are still redirected to GitLab; there is no password form.
+- Basic-auth users are treated as members of all `GITLAB_GROUPS`.
+- The feature is only active while at least one user exists. `install.sh` warns which users are active, so leftovers from an earlier `basic` setup don't go unnoticed – remove them with `./install.sh remove-user <name>`.
+- Changes are applied by recreating oauth2-proxy. Use `./install.sh` (not a plain `docker compose up`) to restart it, otherwise basic auth is disabled until the next `./install.sh`.
+- Use a long random password per consumer and store it as a masked CI variable.
 
 ## Deploy user for GitLab CI
 

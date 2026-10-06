@@ -2,7 +2,8 @@
 # Review infrastructure: Traefik + dashboard (+ optional GitLab OIDC)
 #
 #   ./install.sh                 install or update (idempotent)
-#   ./install.sh add-user NAME   add/update a basic-auth user (password prompt)
+#   ./install.sh add-user NAME   add/update a basic-auth user (password prompt; with AUTH_MODE=oidc
+#                                accepted in addition to GitLab login, e.g. for automated tests)
 #   ./install.sh remove-user NAME
 #   ./install.sh users           list basic-auth users
 #   ./install.sh status          show infra containers and deployed MR / branch environments
@@ -39,13 +40,26 @@ set_env_value() {   # set_env_value KEY VALUE – replace or append in .env, kee
   cat "$tmp" > .env; rm -f "$tmp"
 }
 
-reload_auth() {     # Traefik only watches dynamic/, so touch it to re-read the users file
+reload_auth() {
+  # basic: Traefik only watches dynamic/, so touch it to re-read the users file
   [[ -f "$AUTH_FILE" ]] && touch "$AUTH_FILE" || true
+  # oidc: oauth2-proxy reads the users file only at startup (and needs at least one user)
+  [[ -f .env ]] && load_env
+  if [[ "${AUTH_MODE:-}" == "oidc" && -n "$(docker compose --profile oidc ps -q oauth2-proxy 2>/dev/null)" ]]; then
+    compose up -d --force-recreate oauth2-proxy >/dev/null 2>&1 || warn "Could not restart oauth2-proxy."
+  fi
 }
 
 compose() {
   local profiles=()
   [[ "${AUTH_MODE:-}" == "oidc" ]] && profiles=(--profile oidc)
+  # oidc: users from the users file may log in with basic auth in addition to GitLab (automation).
+  # oauth2-proxy refuses to start with an empty users file, so only pass it if it has entries.
+  if [[ "${AUTH_MODE:-}" == "oidc" && -s "$USERS_FILE" ]]; then
+    export OAUTH2_HTPASSWD_FILE=/etc/oauth2-proxy/auth/users.htpasswd
+  else
+    export OAUTH2_HTPASSWD_FILE=
+  fi
   docker compose "${profiles[@]}" "$@"
 }
 
@@ -87,6 +101,9 @@ cmd_install() {
 
   if [[ "$AUTH_MODE" == "basic" && ! -s "$USERS_FILE" ]]; then
     warn "No basic-auth users yet – add one with: ./install.sh add-user <name>"
+  fi
+  if [[ "$AUTH_MODE" == "oidc" && -s "$USERS_FILE" ]]; then
+    warn "Basic auth is accepted in addition to GitLab login for: $(cut -d: -f1 "$USERS_FILE" | paste -sd, -) (remove with ./install.sh remove-user <name>)"
   fi
 
   info "Activating auth mode: $AUTH_MODE"
