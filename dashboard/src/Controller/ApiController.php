@@ -19,7 +19,18 @@ final class ApiController
     #[Route('/api/environments', name: 'api_environments', methods: ['GET', 'HEAD'])]
     public function environments(Request $request): Response
     {
-        $response = new JsonResponse($this->provider->fetch());
+        $data = $this->provider->fetch();
+
+        // Optional filter on the GitLab project path, e.g. ?project=group/app
+        $project = $request->query->getString('project');
+        if ('' !== $project) {
+            $data['environments'] = array_values(array_filter(
+                $data['environments'],
+                static fn (array $env): bool => $env['project'] === $project,
+            ));
+        }
+
+        $response = new JsonResponse($data);
         $response->setEncodingOptions(\JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE);
 
         // Polling clients revalidate via ETag and get a body-less 304 while nothing changed

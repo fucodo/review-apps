@@ -17,8 +17,9 @@
 </head>
 <body>
 <main>
-  <h1>Review-Umgebungen</h1>
-  <review-environments src="{{ path('api_environments') }}" refresh="30"></review-environments>
+  {% set project = app.request.query.get('project', '') %}
+  <h1>Review-Umgebungen{% if project %} · {{ project }}{% endif %}</h1>
+  <review-environments src="{{ path('api_environments') }}" refresh="30" project="{{ project }}"></review-environments>
 </main>
 </body>
 </html>

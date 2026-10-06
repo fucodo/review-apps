@@ -174,7 +174,7 @@ cmd_status() {
   echo
   info "Deployed MR environments"
   docker ps -a --filter label=review.mr --filter label=review.title \
-    --format 'table {{.Label "review.mr"}}\t{{.Label "review.branch"}}\t{{.Status}}\t{{.Label "review.url"}}'
+    --format 'table {{.Label "review.project"}}\t{{.Label "review.mr"}}\t{{.Label "review.branch"}}\t{{.Status}}\t{{.Label "review.url"}}'
 }
 
 case "${1:-install}" in

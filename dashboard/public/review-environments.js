@@ -1,5 +1,5 @@
 /**
- * <review-environments src="/api/environments" refresh="30">
+ * <review-environments src="/api/environments" refresh="30" project="group/app">
  *
  * Dependency-free web component listing all deployed review environments.
  * Polls the API (ETag revalidation, so unchanged data costs a 304), pauses while
@@ -64,7 +64,7 @@ function time(iso) {
 }
 
 class ReviewEnvironments extends HTMLElement {
-  static observedAttributes = ['src', 'refresh'];
+  static observedAttributes = ['src', 'refresh', 'project'];
 
   #data = null;
   #error = null;
@@ -79,6 +79,18 @@ class ReviewEnvironments extends HTMLElement {
 
   get src() {
     return this.getAttribute('src') ?? '/api/environments';
+  }
+
+  /** Optional GitLab project path (CI_PROJECT_PATH), limits the list to this project. */
+  get project() {
+    return this.getAttribute('project') ?? '';
+  }
+
+  /** API URL including the project filter. */
+  get url() {
+    const url = new URL(this.src, location.href);
+    if (this.project) url.searchParams.set('project', this.project);
+    return url.href;
   }
 
   /** Refresh interval in seconds, 0 disables polling. */
@@ -121,7 +133,7 @@ class ReviewEnvironments extends HTMLElement {
 
     try {
       // "no-cache" revalidates with If-None-Match, unchanged data comes back as 304 from the browser cache
-      const res = await fetch(this.src, {
+      const res = await fetch(this.url, {
         headers: { Accept: 'application/json' },
         cache: 'no-cache',
         credentials: 'same-origin',
@@ -157,7 +169,7 @@ class ReviewEnvironments extends HTMLElement {
 
     const meta = h('p', { class: 'meta' },
       `${envs.length} Umgebung(en) · Stand ${time(this.#data?.fetched_at)} · `,
-      h('a', { href: this.src }, 'JSON'),
+      h('a', { href: this.url }, 'JSON'),
     );
     if (this.#error && envs.length) meta.append(' · ', h('span', { class: 'error' }, this.#error));
 
@@ -165,8 +177,10 @@ class ReviewEnvironments extends HTMLElement {
     if (!envs.length) {
       body = this.#error ? h('div', { class: 'error' }, this.#error) : h('div', { class: 'empty' }, 'Keine Review-Umgebungen deployt.');
     } else {
+      // The project column is redundant when filtered to a single project
+      const columns = ['Projekt', 'MR', 'Titel', 'Branch', 'Commit', 'Autor', 'Deployt', 'Dienste'].slice(this.project ? 1 : 0);
       body = h('table', {},
-        h('thead', {}, h('tr', {}, ...['MR', 'Titel', 'Branch', 'Commit', 'Autor', 'Deployt', 'Dienste'].map((t) => h('th', {}, t)))),
+        h('thead', {}, h('tr', {}, ...columns.map((t) => h('th', {}, t)))),
         h('tbody', {}, ...envs.map((env) => this.#row(env))),
       );
     }
@@ -174,11 +188,12 @@ class ReviewEnvironments extends HTMLElement {
     content.replaceChildren(meta, h('div', { class: 'wrap' }, body));
   }
 
-  #row({ mr, app, services }) {
+  #row({ project, mr, app, services }) {
     const a = app ?? {};
     const mrUrl = safeUrl(a.mr_url ?? '');
 
     return h('tr', {},
+      this.project ? null : h('td', {}, project || '–'),
       h('td', {}, mrUrl ? h('a', { href: mrUrl }, `!${mr}`) : `!${mr}`),
       h('td', { class: 'title' }, app ? a.title : h('i', {}, 'App-Container fehlt')),
       h('td', {}, h('code', {}, a.branch ?? '')),

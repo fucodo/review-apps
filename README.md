@@ -81,14 +81,15 @@ Complete example: `examples/docker-compose.review.yml`.
 
 | Label | Where | Meaning |
 |---|---|---|
-| `review.mr` | all containers of the stack | MR IID, groups the containers |
+| `review.project` | all containers of the stack | GitLab project path (`${CI_PROJECT_PATH}`); together with `review.mr` it groups the containers, since MR IIDs are only unique per project |
+| `review.mr` | all containers of the stack | MR IID (`${CI_MERGE_REQUEST_IID}`) |
 | `review.role` | all | `app` (metadata) or `service` (sub-service) |
 | `review.title`, `review.branch`, `review.commit`, `review.author`, `review.url`, `review.mr_url`, `review.deployed_at` | `app` | Shown in the dashboard |
 | `review.service.name` | `service` | Chip label |
 | `review.service.url` | `service`, optional | Turns the chip into a link |
 | `review.service.order` | `service`, optional | Sort order |
 
-The dashboard provides the same data in machine-readable form at `/api/environments` (`?format=json` still works). The page itself loads its data exclusively through this API and refreshes every 30 seconds.
+The dashboard provides the same data in machine-readable form at `/api/environments` (`?format=json` still works). Both the page and the API accept `?project=<CI_PROJECT_PATH>` to show a single project only. The page itself loads its data exclusively through this API and refreshes every 30 seconds.
 
 ## Operations
 

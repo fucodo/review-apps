@@ -13,7 +13,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * Reads review containers from the read-only Docker API (docker-socket-proxy, CONTAINERS=1)
- * and groups them per merge request.
+ * and groups them per project and merge request.
  *
  * Results are cached for a few seconds, so any number of open dashboards cause at most one
  * Docker API call per TTL. If the API is unreachable, the last successful result is served
@@ -99,11 +99,14 @@ final class ReviewEnvironmentProvider
             if (0 === $mr) {
                 continue;
             }
+            // MR IIDs are only unique per project
+            $project = $l['review.project'] ?? '';
+            $key = $project."\0".$mr;
 
-            $groups[$mr] ??= ['mr' => $mr, 'app' => null, 'services' => []];
+            $groups[$key] ??= ['project' => $project, 'mr' => $mr, 'app' => null, 'services' => []];
 
             if ('app' === ($l['review.role'] ?? 'app')) {
-                $groups[$mr]['app'] = [
+                $groups[$key]['app'] = [
                     'title' => $l['review.title'] ?? '',
                     'branch' => $l['review.branch'] ?? '',
                     'commit' => $l['review.commit'] ?? '',
@@ -115,7 +118,7 @@ final class ReviewEnvironmentProvider
                     'status' => $c['Status'] ?? '',
                 ];
             } else {
-                $groups[$mr]['services'][] = [
+                $groups[$key]['services'][] = [
                     'name' => $l['review.service.name'] ?? ($l['com.docker.compose.service'] ?? '?'),
                     'url' => $l['review.service.url'] ?? '',
                     'order' => (int) ($l['review.service.order'] ?? 100),
@@ -129,8 +132,10 @@ final class ReviewEnvironmentProvider
             usort($g['services'], static fn (array $a, array $b): int => [$a['order'], $a['name']] <=> [$b['order'], $b['name']]);
         }
         unset($g);
-        krsort($groups);
 
-        return array_values($groups);
+        $groups = array_values($groups);
+        usort($groups, static fn (array $a, array $b): int => [$a['project'], $b['mr']] <=> [$b['project'], $a['mr']]);
+
+        return $groups;
     }
 }

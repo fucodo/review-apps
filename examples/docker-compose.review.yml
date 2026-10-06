@@ -25,6 +25,7 @@ services:
       traefik.http.routers.${STACK}.service: ${STACK}
       traefik.http.services.${STACK}.loadbalancer.server.port: "80"
       # Dashboard metadata
+      review.project: "${CI_PROJECT_PATH}"
       review.mr: "${CI_MERGE_REQUEST_IID}"
       review.role: app
       review.title: "${CI_MERGE_REQUEST_TITLE}"
@@ -45,6 +46,7 @@ services:
       MARIADB_RANDOM_ROOT_PASSWORD: "1"
     volumes: [db:/var/lib/mysql]
     labels:
+      review.project: "${CI_PROJECT_PATH}"
       review.mr: "${CI_MERGE_REQUEST_IID}"
       review.role: service
       review.service.name: DB
@@ -62,6 +64,7 @@ services:
       traefik.http.routers.${STACK}-mail.entrypoints: websecure
       traefik.http.routers.${STACK}-mail.middlewares: review-auth@file
       traefik.http.services.${STACK}-mail.loadbalancer.server.port: "8025"
+      review.project: "${CI_PROJECT_PATH}"
       review.mr: "${CI_MERGE_REQUEST_IID}"
       review.role: service
       review.service.name: Mail
