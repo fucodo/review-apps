@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Review-Umgebungen</title>
-<meta name="application-name" content="Review-Umgebungen">
+<title>Review environments</title>
+<meta name="application-name" content="Review environments">
 <meta name="apple-mobile-web-app-title" content="Reviews">
 <link rel="manifest" href="{{ path('manifest') }}">
 {% if logo.src %}
@@ -35,7 +35,7 @@
       {% set img %}<img src="{{ logo.src }}" alt="Logo">{% endset %}
       {% if logo.link %}<a href="{{ logo.link }}">{{ img }}</a>{% else %}{{ img }}{% endif %}
     {% endif %}
-    <h1>Review-Umgebungen{% if project %} · {{ project }}{% endif %}</h1>
+    <h1>Review environments{% if project %} · {{ project }}{% endif %}</h1>
   </header>
   <review-environments src="{{ path('api_environments') }}" refresh="30" project="{{ project }}"></review-environments>
 </main>

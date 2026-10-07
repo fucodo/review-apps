@@ -191,7 +191,7 @@ cmd_status() {
   echo
   info "Deployed environments (app containers)"
   docker ps -a --filter label=review.title \
-    --format 'table {{.Label "review.type"}}\t{{.Label "review.project"}}\t{{.Label "review.mr"}}\t{{.Label "review.branch"}}\t{{.Status}}\t{{.Label "review.url"}}'
+    --format 'table {{.Label "review.type"}}\t{{.Label "review.project"}}\t{{.Label "review.mr"}}\t{{.Label "review.branch"}}\t{{.Label "review.variant"}}\t{{.Status}}\t{{.Label "review.url"}}'
 }
 
 case "${1:-install}" in

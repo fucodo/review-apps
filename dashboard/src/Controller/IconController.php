@@ -53,7 +53,7 @@ final class IconController
     public function manifest(): Response
     {
         $manifest = [
-            'name' => 'Review-Umgebungen',
+            'name' => 'Review environments',
             'short_name' => 'Reviews',
             'start_url' => $this->urls->generate('dashboard'),
             'display' => 'browser',

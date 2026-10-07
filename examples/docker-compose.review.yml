@@ -2,7 +2,12 @@
 # Used for both deployment types, deployed by GitLab CI with:
 #   merge requests:     docker compose -p review-mr-<iid> -f docker-compose.review.yml up -d
 #   protected branches: REVIEW_TYPE=branch docker compose -p review-<branch-slug> -f docker-compose.review.yml up -d
-# Expected variables (from CI): IMAGE, STACK, REVIEW_HOST, ADMIN_PASSWORD, REVIEW_TYPE (branch deployments only)
+# Variants (same image, different use case, e.g. "demo" with sample data): set REVIEW_VARIANT and
+# make the compose project name, STACK and REVIEW_HOST unique per variant, e.g.
+#   REVIEW_VARIANT=demo docker compose -p review-mr-<iid>-demo -f docker-compose.review.yml up -d
+# The dashboard shows all variants of an MR / branch in one card.
+# Expected variables (from CI): IMAGE, STACK, REVIEW_HOST, ADMIN_PASSWORD,
+#   REVIEW_TYPE (branch deployments only), REVIEW_VARIANT (variants only)
 services:
   app:
     image: ${IMAGE}
@@ -20,25 +25,26 @@ services:
     depends_on: [db]
     networks: [default, traefik]
     labels:
-      traefik.enable: "true"
-      traefik.http.routers.${STACK}.rule: Host(`${REVIEW_HOST}`)
-      traefik.http.routers.${STACK}.entrypoints: websecure
-      traefik.http.routers.${STACK}.middlewares: review-auth@file
-      traefik.http.routers.${STACK}.service: ${STACK}
-      traefik.http.services.${STACK}.loadbalancer.server.port: "80"
+      - "traefik.enable=true"
+      - "traefik.http.routers.${STACK}.rule=Host(`${REVIEW_HOST}`)"
+      - "traefik.http.routers.${STACK}.entrypoints=websecure"
+      - "traefik.http.routers.${STACK}.middlewares=review-auth@file"
+      - "traefik.http.routers.${STACK}.service=${STACK}"
+      - "traefik.http.services.${STACK}.loadbalancer.server.port=80"
       # Dashboard metadata
-      review.type: "${REVIEW_TYPE:-mr}"
-      review.project: "${CI_PROJECT_PATH}"
-      review.mr: "${CI_MERGE_REQUEST_IID:-}"
-      review.branch: "${CI_COMMIT_REF_NAME}"
-      review.role: app
-      review.title: "${CI_MERGE_REQUEST_TITLE:-${CI_COMMIT_TITLE}}"
-      review.branch_url: "${CI_PROJECT_URL}/-/tree/${CI_COMMIT_REF_NAME}"
-      review.commit: "${CI_COMMIT_SHORT_SHA}"
-      review.author: "${GITLAB_USER_NAME}"
-      review.url: "https://${REVIEW_HOST}/"
-      review.mr_url: "${CI_MERGE_REQUEST_PROJECT_URL}/-/merge_requests/${CI_MERGE_REQUEST_IID}"
-      review.deployed_at: "${CI_JOB_STARTED_AT}"
+      - "review.type=${REVIEW_TYPE:-mr}"
+      - "review.project=${CI_PROJECT_PATH}"
+      - "review.mr=${CI_MERGE_REQUEST_IID:-}"
+      - "review.branch=${CI_COMMIT_REF_NAME}"
+      - "review.variant=${REVIEW_VARIANT:-}"
+      - "review.role=app"
+      - "review.title=${CI_MERGE_REQUEST_TITLE:-${CI_COMMIT_TITLE}}"
+      - "review.branch_url=${CI_PROJECT_URL}/-/tree/${CI_COMMIT_REF_NAME}"
+      - "review.commit=${CI_COMMIT_SHORT_SHA}"
+      - "review.author=${GITLAB_USER_NAME}"
+      - "review.url=https://${REVIEW_HOST}/"
+      - "review.mr_url=${CI_MERGE_REQUEST_PROJECT_URL}/-/merge_requests/${CI_MERGE_REQUEST_IID}"
+      - "review.deployed_at=${CI_JOB_STARTED_AT}"
 
   db:
     image: mariadb:11
@@ -50,13 +56,14 @@ services:
       MARIADB_RANDOM_ROOT_PASSWORD: "1"
     volumes: [db:/var/lib/mysql]
     labels:
-      review.type: "${REVIEW_TYPE:-mr}"
-      review.project: "${CI_PROJECT_PATH}"
-      review.mr: "${CI_MERGE_REQUEST_IID:-}"
-      review.branch: "${CI_COMMIT_REF_NAME}"
-      review.role: service
-      review.service.name: DB
-      review.service.order: "90"
+      - "review.type=${REVIEW_TYPE:-mr}"
+      - "review.project=${CI_PROJECT_PATH}"
+      - "review.mr=${CI_MERGE_REQUEST_IID:-}"
+      - "review.branch=${CI_COMMIT_REF_NAME}"
+      - "review.variant=${REVIEW_VARIANT:-}"
+      - "review.role=service"
+      - "review.service.name=DB"
+      - "review.service.order=90"
 
   mailpit:
     image: axllent/mailpit
@@ -65,19 +72,20 @@ services:
       MP_WEBROOT: /_mail
     networks: [default, traefik]
     labels:
-      traefik.enable: "true"
-      traefik.http.routers.${STACK}-mail.rule: Host(`${REVIEW_HOST}`) && PathPrefix(`/_mail`)
-      traefik.http.routers.${STACK}-mail.entrypoints: websecure
-      traefik.http.routers.${STACK}-mail.middlewares: review-auth@file
-      traefik.http.services.${STACK}-mail.loadbalancer.server.port: "8025"
-      review.type: "${REVIEW_TYPE:-mr}"
-      review.project: "${CI_PROJECT_PATH}"
-      review.mr: "${CI_MERGE_REQUEST_IID:-}"
-      review.branch: "${CI_COMMIT_REF_NAME}"
-      review.role: service
-      review.service.name: Mail
-      review.service.url: "https://${REVIEW_HOST}/_mail/"
-      review.service.order: "10"
+      - "traefik.enable=true"
+      - "traefik.http.routers.${STACK}-mail.rule=Host(`${REVIEW_HOST}`) && PathPrefix(`/_mail`)"
+      - "traefik.http.routers.${STACK}-mail.entrypoints=websecure"
+      - "traefik.http.routers.${STACK}-mail.middlewares=review-auth@file"
+      - "traefik.http.services.${STACK}-mail.loadbalancer.server.port=8025"
+      - "review.type=${REVIEW_TYPE:-mr}"
+      - "review.project=${CI_PROJECT_PATH}"
+      - "review.mr=${CI_MERGE_REQUEST_IID:-}"
+      - "review.branch=${CI_COMMIT_REF_NAME}"
+      - "review.variant=${REVIEW_VARIANT:-}"
+      - "review.role=service"
+      - "review.service.name=Mail"
+      - "review.service.url=https://${REVIEW_HOST}/_mail/"
+      - "review.service.order=10"
 
 volumes:
   persistent:

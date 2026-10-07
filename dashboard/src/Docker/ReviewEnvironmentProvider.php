@@ -55,7 +55,7 @@ final class ReviewEnvironmentProvider
 
                 return [
                     'ok' => false,
-                    'error' => 'Docker-API nicht erreichbar',
+                    'error' => 'Docker API unreachable',
                     'fetched_at' => $last['fetched_at'] ?? null,
                     'branches' => $last['branches'] ?? [],
                     'environments' => $last['environments'] ?? [],
@@ -102,8 +102,10 @@ final class ReviewEnvironmentProvider
     }
 
     /**
-     * Groups all containers of one environment: the app carries the metadata, every other
-     * container with review.role=service becomes a sub-service (link and/or status).
+     * Groups all containers of one environment (project + MR, or project + branch). An environment
+     * can be deployed in several variants (review.variant, same image for different use cases),
+     * each with its own app and sub-services. Within a variant, the app carries the metadata and
+     * every other container with review.role=service becomes a sub-service (link and/or status).
      *
      * @param list<array<string, mixed>> $containers
      *
@@ -116,6 +118,7 @@ final class ReviewEnvironmentProvider
         foreach ($containers as $c) {
             $l = $c['Labels'] ?? [];
             $project = $l['review.project'] ?? '';
+            $variant = trim($l['review.variant'] ?? '');
 
             if ('branch' === ($l['review.type'] ?? 'mr')) {
                 $branch = $l['review.branch'] ?? '';
@@ -123,7 +126,7 @@ final class ReviewEnvironmentProvider
                     continue;
                 }
                 $group = &$branches[$project."\0".$branch];
-                $group ??= ['project' => $project, 'branch' => $branch, 'app' => null, 'services' => []];
+                $group ??= ['project' => $project, 'branch' => $branch, 'app' => null, 'variants' => []];
             } else {
                 $mr = (int) ($l['review.mr'] ?? 0);
                 if (0 === $mr) {
@@ -131,11 +134,12 @@ final class ReviewEnvironmentProvider
                 }
                 // MR IIDs are only unique per project
                 $group = &$mrs[$project."\0".$mr];
-                $group ??= ['project' => $project, 'mr' => $mr, 'app' => null, 'services' => []];
+                $group ??= ['project' => $project, 'mr' => $mr, 'app' => null, 'variants' => []];
             }
+            $group['variants'][$variant] ??= ['name' => $variant, 'app' => null, 'services' => []];
 
             if ('app' === ($l['review.role'] ?? 'app')) {
-                $group['app'] = [
+                $group['variants'][$variant]['app'] = [
                     'title' => $l['review.title'] ?? '',
                     'branch' => $l['review.branch'] ?? '',
                     'branch_url' => $l['review.branch_url'] ?? '',
@@ -148,7 +152,7 @@ final class ReviewEnvironmentProvider
                     'status' => $c['Status'] ?? '',
                 ];
             } else {
-                $group['services'][] = [
+                $group['variants'][$variant]['services'][] = [
                     'name' => $l['review.service.name'] ?? ($l['com.docker.compose.service'] ?? '?'),
                     'url' => $l['review.service.url'] ?? '',
                     'order' => (int) ($l['review.service.order'] ?? 100),
@@ -159,23 +163,37 @@ final class ReviewEnvironmentProvider
             unset($group);
         }
 
-        $branches = array_map(self::sortServices(...), array_values($branches));
+        $branches = array_map(self::finish(...), array_values($branches));
         usort($branches, static fn (array $a, array $b): int => [$a['project'], $a['branch']] <=> [$b['project'], $b['branch']]);
 
-        $mrs = array_map(self::sortServices(...), array_values($mrs));
+        $mrs = array_map(self::finish(...), array_values($mrs));
         usort($mrs, static fn (array $a, array $b): int => [$a['project'], $b['mr']] <=> [$b['project'], $a['mr']]);
 
         return ['branches' => $branches, 'environments' => $mrs];
     }
 
     /**
+     * Sorts variants (default variant "" first) and their services, and takes the environment
+     * metadata (title, commit, …) from the most recently deployed variant.
+     *
      * @param array<string, mixed> $group
      *
      * @return array<string, mixed>
      */
-    private static function sortServices(array $group): array
+    private static function finish(array $group): array
     {
-        usort($group['services'], static fn (array $a, array $b): int => [$a['order'], $a['name']] <=> [$b['order'], $b['name']]);
+        $variants = array_values($group['variants']);
+        usort($variants, static fn (array $a, array $b): int => [$a['name'] !== '', $a['name']] <=> [$b['name'] !== '', $b['name']]);
+        foreach ($variants as &$v) {
+            usort($v['services'], static fn (array $a, array $b): int => [$a['order'], $a['name']] <=> [$b['order'], $b['name']]);
+        }
+        unset($v);
+
+        $apps = array_filter(array_column($variants, 'app'));
+        usort($apps, static fn (array $a, array $b): int => strcmp($b['deployed_at'], $a['deployed_at']));
+
+        $group['app'] = $apps[0] ?? null;
+        $group['variants'] = $variants;
 
         return $group;
     }

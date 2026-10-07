@@ -104,6 +104,7 @@ Complete example: `examples/docker-compose.review.yml`.
 | `review.project` | all containers of the stack | GitLab project path (`${CI_PROJECT_PATH}`); together with `review.mr` or `review.branch` it groups the containers, since MR IIDs and branch names are only unique per project |
 | `review.mr` | all containers of the stack (`mr`) | MR IID (`${CI_MERGE_REQUEST_IID}`) |
 | `review.branch` | all containers of the stack | Branch name (`${CI_COMMIT_REF_NAME}`); groups the containers of `branch` deployments, for `mr` only shown |
+| `review.variant` | all containers of the stack, optional | Variant name (`${REVIEW_VARIANT:-}`), see below; empty = default variant |
 | `review.role` | all | `app` (metadata) or `service` (sub-service) |
 | `review.title`, `review.commit`, `review.author`, `review.url`, `review.deployed_at` | `app` | Shown in the dashboard |
 | `review.mr_url` | `app` (`mr`) | Link of the MR number |
@@ -112,7 +113,9 @@ Complete example: `examples/docker-compose.review.yml`.
 | `review.service.url` | `service`, optional | Turns the chip into a link |
 | `review.service.order` | `service`, optional | Sort order |
 
-The dashboard provides the same data in machine-readable form at `/api/environments` (`?format=json` still works): `branches` holds the protected branch deployments, `environments` the MR environments. Both the page and the API accept `?project=<CI_PROJECT_PATH>` to show a single project only. The page itself loads its data exclusively through this API and refreshes every 30 seconds.
+**Variants:** An MR or branch can be deployed several times from the same image for different use cases (e.g. `demo` with sample data, `empty` for installation tests). Set `REVIEW_VARIANT` in the deploy job – the stack file sets `"review.variant=${REVIEW_VARIANT:-}"` on all containers – and make the compose project name, `STACK` and `REVIEW_HOST` unique per variant (e.g. `review-mr-42-demo`, `mr-42-demo.<BASE_DOMAIN>`). The dashboard groups all variants of an MR / branch in one card: every variant gets its own row with a ▶ button (named after the variant, `Default` without variant) that opens its app, followed by its sub-services and notes such as `stopped` or `older deployment: <commit>`. Title, commit and author of the card are taken from the most recently deployed variant.
+
+The dashboard provides the same data in machine-readable form at `/api/environments` (`?format=json` still works): `branches` holds the protected branch deployments, `environments` the MR environments. Each entry lists its `variants` (`name`, `app`, `services`), `app` holds the metadata of the most recently deployed variant. Both the page and the API accept `?project=<CI_PROJECT_PATH>` to show a single project only. The page itself loads its data exclusively through this API and refreshes every 30 seconds.
 
 **Logo:** `DASHBOARD_LOGO` in `.env` shows a logo in the dashboard header, `DASHBOARD_LOGO_LINK` makes it a link. The logo can be an http(s) URL, a data URI (quote it, because `install.sh` sources `.env` and the `;` would break the line) or plain base64 image data (paste the output of `base64 -w0 logo.png`; the image type is detected automatically). Run `./install.sh` afterwards to apply it.
 
